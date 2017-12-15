@@ -1,0 +1,5 @@
+Localization answers the question:
+1. Where is our car in a given map with an accuracy of 10 cm or less ?
+cannot trust GPS, it's not accurate enough.
+
+2. Onboard sensors are used to estimate transformation between measurements and a given map.
