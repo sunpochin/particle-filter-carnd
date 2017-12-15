@@ -47,6 +47,33 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 	//  http://en.cppreference.com/w/cpp/numeric/random/normal_distribution
 	//  http://www.cplusplus.com/reference/random/default_random_engine/
 
+	default_random_engine gen;
+	for (int i = 0; i < num_particles; ++i) {
+		Particle part = particles[i];
+		
+		// 1. Add measurements to each particle
+		// codes modified from lecture: https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/2c318113-724b-4f9f-860c-cb334e6e4ad7/lessons/5c50790c-5370-4c80-aff6-334659d5c0d9/concepts/56d08bf5-8668-42e7-a718-1ef40d444259
+		double partx = part.x;
+		double party = part.y;
+		double parttheta = part.theta;
+		partx = partx + (velocity / yaw_rate) * (sin(parttheta + yaw_rate * delta_t) - sin(parttheta));
+		party = party + (velocity / yaw_rate) * (-cos(parttheta + yaw_rate * delta_t) + cos(parttheta));
+		parttheta = parttheta + yaw_rate;
+
+		// 2. and add random Gaussian noise.
+		// codes modified from lecture: https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/2c318113-724b-4f9f-860c-cb334e6e4ad7/lessons/5c50790c-5370-4c80-aff6-334659d5c0d9/concepts/53081ef1-a14c-4ae9-a68f-3ddc258cfd95
+		// std_pos[]: 0.3, 0.3, 0.01
+		normal_distribution<double> dist_x(partx, std_pos[0]);
+		normal_distribution<double> dist_y(party, std_pos[1]);
+		normal_distribution<double> dist_theta(parttheta, std_pos[2]);
+		double sample_x = dist_x(gen);
+		double sample_y = dist_y(gen);
+		double sample_theta = dist_theta(gen);
+		particles[i].x = sample_x;
+		particles[i].y = sample_y;
+		particles[i].theta = sample_theta;
+	}
+
 }
 
 void ParticleFilter::dataAssociation(std::vector<LandmarkObs> predicted, std::vector<LandmarkObs>& observations) {
