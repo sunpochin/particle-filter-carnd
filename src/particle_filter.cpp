@@ -22,8 +22,8 @@ using namespace std;
 // "Debug Suggestion - Testing Prediction Step", JacquesRoth.
 // a flag to debug ::prediction. Skips entire ::updateWeights and ::resample .
 // https://discussions.udacity.com/t/debug-suggestion-testing-prediction-step/306124?u=drivewell
-bool b_debugPrediction = true;
-
+// bool b_debugPrediction = true;
+bool b_debugPrediction = false;
 
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
@@ -43,6 +43,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 			part.id = iter;
 			part.x = x;
 			part.y = y;
+			// missed initialization of weights.
+			part.weight = 1.0f;
+			weights.push_back(1.0f);
 			particles.push_back(part);
 		}
 		is_initialized = true;
@@ -152,32 +155,43 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		// cout << "Xp : " << Xp << " Yp : " << Yp << endl;
 		std::vector<LandmarkObs> observations_transf;
 		particles[ni].weight = 1;
+		if (bdebug) {
+			cout << endl << "===== Transformations =====" << endl;
+		}
 		for(int nj = 0; nj < nobssize; nj++) {
 			double Xc = observations[nj].x;
 			double Yc = observations[nj].y;
 			double id = observations[nj].id;
 
-			double tranfx = Xc * cos(theta) + Yc * (-sin(theta)) + Xp;
-			double tranfy = Xc * sin(theta) + Yc * ( cos(theta)) + Yp;
+			double transfx = Xc * cos(theta) + Yc * (-sin(theta)) + Xp;
+			double transfy = Xc * sin(theta) + Yc * ( cos(theta)) + Yp;
 			
 			LandmarkObs obs_t;
 			obs_t.id = observations[nj].id;
-			obs_t.x = tranfx;
-			obs_t.y = tranfy;
+			obs_t.x = transfx;
+			obs_t.y = transfy;
 			observations_transf.push_back(obs_t);
 
 			// 3. For each transformed observation you calculate a distance to all landmarks:
 			vector <double> dists;
 			for (Map::single_landmark_s slm : map_landmarks.landmark_list) {
-				double dst = dist(slm.x_f, slm.y_f, tranfx, tranfy);
+				double dst = dist(slm.x_f, slm.y_f, transfx, transfy);
 				dists.push_back(dst);
 			}
 
 			// 4. vector dists contains distances to all landmarks for single observation. 
-			//    You choose the minimum distance and associate id of landmark for this distance to the observation.
+			//    choose the minimum distance and associate id of landmark for this distance to the observation.
 			vector<double>::iterator result = min_element(begin(dists), end(dists));
 			Map::single_landmark_s lm = map_landmarks.landmark_list[distance(begin(dists), result)];
 			obs_t.id = lm.id_i;
+			if (bdebug) {
+				cout << " Obs(x,y) :" << " (" << Xc << "," << Yc << ") , ";
+				cout << " Trans Obs(x,y) :" << " (" << transfx << "," << transfy << ") , " << endl;
+				cout << " Landmark idx :" << obs_t.id ;
+				//cout << " map_landmarks.landmark_list[ " << obs_t.id << " ] " << map_landmarks.landmark_list[obs_t.id] << endl;
+				cout << "(" << lm.x_f << "," << lm.y_f << ") " << endl;
+				// cout << " Trans Obs(x,y) :" << " (" << transfx << "," << transfy << ") , " << endl;
+			}
 
 			// 5. when your observation has an associated landmark, you're calculating 
 			//    the probability that particular particle's observation saw this particular landmark.
@@ -186,6 +200,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double sig_x = std_landmark[0];
 			double sig_y = std_landmark[1];
 			double gauss_norm = (1/(2 * M_PI * sig_x * sig_y) );
+			//"when you calculate the weight, make sure you compare x,y coordinates of landmark and observation but not landmark and particle"
 			double exponent = pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) ) + 
 				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
 			double expval = exp(-exponent);
@@ -197,10 +212,10 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 					cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
 				}
 			}
-
-//			if (weight > 0.0f) {
+			if (weight > 0.0f) {
 			// must avoid a very very very small weight, which will making "particle total weight" zero.
-			if (weight > 1.00E-40f) {
+			// if (weight > 1.00E-40f) {
+				// debug
 				particles[ni].weight = particles[ni].weight * weight;
 				// cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
 			}
@@ -208,7 +223,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 		if (bdebug) {
 			cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
 		}
-
+		weights[ni] = particles[ni].weight;
 	}
 
 }
@@ -223,52 +238,6 @@ void ParticleFilter::resample() {
 
 	bool bdebug = true;
 	bdebug = false;
-	
-	// codes from Lesson 13: Particle Filters "19. Quiz: New Particle".
-	// translate python codes to cpp.
-	// i = 1
-	// while i <=1000:
-	// 	x = random.randint(1,1000) 
-	// 	xw = random.random() 
-	// 	# if this particle is lucky enough to be >= xw.
-	// 	if w[x-1]/wsum >= xw:
-	// 		p3.append(p[x-1])
-	// 		i = i + 1
-	// double wsum = 0;
-	// for (int it = 0; it < num_particles; it++) {
-	// 	wsum = wsum + particles[it].weight;
-	// }
-	// cout << "wsum : " << wsum << endl;
-	
-	// int ni = 1;
-	// while(ni <= num_particles) {
-	// 	int idx = rand() % num_particles + 1;
-	// 	// default_random_engine gen;
-	// 	// discrete_distribution<> dist(0, num_particles);
-	// 	// int idx = dist(gen);
-	// 	double thresholdweight = ((double) rand() / (RAND_MAX));
-	// 	double prob = particles[idx].weight / wsum;
-	// 	if (bdebug) {
-	// 		cout << " thresholdweight : " << thresholdweight << endl;
-	// 		cout << " idx : " << idx << endl;
-	// 		cout << " particles[idx].weight  : " << particles[idx].weight << endl;
-	// 		cout << " particles[idx].weight / wsum : " << prob << endl;
-	// 	}
-	// 	cout << " idx : " << idx << endl;
-	// 	// if this particle is lucky enough to be >= xw.
-		 
-	// 	if (prob > thresholdweight) {
-	// 		if (bdebug) {
-	// 			cout << " particles[idx - 1].weight : " << particles[idx - 1].weight << endl;
-	// 		}
-	// 		new_particles.push_back(particles[idx - 1] );
-	// 		ni = ni + 1;
-	// 		cout << "ni :" << ni << endl;
-	// 	} else {
-	// 		cout << "smaller, prob :"  << prob << " thresholdweight : "<< thresholdweight << endl;
-			
-	// 	}
-	// }
 
 	// https://discussions.udacity.com/t/resampling-algorithm-using-resampling-wheel/241313/16
 	// seems using discrete_distribution is way faster than my naive sampling code in Lesson 13: Particle Filters "19. Quiz: New Particle".
