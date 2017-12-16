@@ -27,9 +27,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	if (!is_initialized) {
 		cout << "x: " << x << ", y: " << y << ", theat: " << theta << ", std: " ;
-		num_particles = 10;
+		num_particles = 100;
 		// debug
-		// num_particles = 1;
+		num_particles = 2;
 		for(int iter = 0; iter < num_particles; iter++) {
 			// cout << "particles[iter] : " << particles[iter];
 			Particle part = Particle();
@@ -58,9 +58,13 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		double partx = part.x;
 		double party = part.y;
 		double parttheta = part.theta;
-		partx = partx + (velocity / yaw_rate) * (sin(parttheta + yaw_rate * delta_t) - sin(parttheta));
-		party = party + (velocity / yaw_rate) * (-cos(parttheta + yaw_rate * delta_t) + cos(parttheta));
-		parttheta = parttheta + yaw_rate;
+		partx = partx + (velocity / yaw_rate) * (sin(parttheta + yaw_rate * delta_t) 
+			- sin(parttheta));
+		party = party + (velocity / yaw_rate) * (-cos(parttheta + yaw_rate * delta_t) 
+			+ cos(parttheta));
+		// ok it turned out my previous prediction goes all the way in y-axis 
+		// because at parttheta I forgot to "* delta_t" to yaw_rate ! Don't miss this again.
+		parttheta = parttheta + yaw_rate * delta_t;
 
 		// 2. and add random Gaussian noise.
 		// codes modified from lecture: https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/2c318113-724b-4f9f-860c-cb334e6e4ad7/lessons/5c50790c-5370-4c80-aff6-334659d5c0d9/concepts/53081ef1-a14c-4ae9-a68f-3ddc258cfd95
@@ -166,17 +170,24 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double sig_x = std_landmark[0];
 			double sig_y = std_landmark[1];
 			double gauss_norm = (1/(2 * M_PI * sig_x * sig_y) );
-			double exponent= pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) )+ 
+			double exponent = pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) ) + 
 				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
+			double expval = exp(-exponent);
 			double weight = gauss_norm * exp(-exponent);
-			// cout << "weight : " << weight << endl;
-			// maybe I should only multiple with observations of "obs_t.id" ?
-			if (weight > 0.0f) {
+			cout << "observation weight : " << weight << endl;
+			if (weight == 0) {
+				cout << "it shouldn't be zero!" << endl;
+				cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
+			}
+
+//			if (weight > 0.0f) {
+			// must avoid a very very very small weight, which will making "particle total weight" zero.
+			if (weight > 1.00E-40f) {
 				particles[ni].weight = particles[ni].weight * weight;
-				// cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
+				cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
 			}
 		}
-		cout << "particles[ " << ni << "].weight : " << particles[ni].weight << endl;
+		cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
 
 	}
 
@@ -189,6 +200,7 @@ void ParticleFilter::resample() {
 
 	bool bdebug = true;
 	bdebug = false;
+	
 	// codes from Lesson 13: Particle Filters "19. Quiz: New Particle".
 	// translate python codes to cpp.
 	// i = 1
@@ -199,37 +211,55 @@ void ParticleFilter::resample() {
 	// 	if w[x-1]/wsum >= xw:
 	// 		p3.append(p[x-1])
 	// 		i = i + 1
-	double wsum = 0;
-	for (int it = 0; it < num_particles; it++) {
-		wsum = wsum + particles[it].weight;
-	}
-	cout << "wsum : " << wsum << endl;
+	// double wsum = 0;
+	// for (int it = 0; it < num_particles; it++) {
+	// 	wsum = wsum + particles[it].weight;
+	// }
+	// cout << "wsum : " << wsum << endl;
 	
-	std::vector<Particle> new_particles;
-	int ni = 1;
-	while(ni <= num_particles) {
-		double idx = rand() % num_particles + 1;
-		double thresholdweight = ((double) rand() / (RAND_MAX));
-		double prob = particles[idx].weight / wsum;
-		if (bdebug) {
-			cout << " thresholdweight : " << thresholdweight << endl;
-			cout << " idx : " << idx << endl;
-			cout << " particles[idx].weight  : " << particles[idx].weight << endl;
-			cout << " particles[idx].weight / wsum : " << prob << endl;
-		}
-		cout << " idx : " << idx << endl;
-	 	// if this particle is lucky enough to be >= xw.
-		if (prob > thresholdweight) {
-			if (bdebug) {
-				cout << " particles[idx - 1].weight : " << particles[idx - 1].weight << endl;
-			}
-			new_particles.push_back(particles[idx - 1] );
-			ni = ni + 1;
-			cout << "ni :" << ni << endl;
-		} else {
-			cout << "smaller, prob :"  << prob << " thresholdweight : "<< thresholdweight << endl;
+	// int ni = 1;
+	// while(ni <= num_particles) {
+	// 	int idx = rand() % num_particles + 1;
+	// 	// default_random_engine gen;
+	// 	// discrete_distribution<> dist(0, num_particles);
+	// 	// int idx = dist(gen);
+	// 	double thresholdweight = ((double) rand() / (RAND_MAX));
+	// 	double prob = particles[idx].weight / wsum;
+	// 	if (bdebug) {
+	// 		cout << " thresholdweight : " << thresholdweight << endl;
+	// 		cout << " idx : " << idx << endl;
+	// 		cout << " particles[idx].weight  : " << particles[idx].weight << endl;
+	// 		cout << " particles[idx].weight / wsum : " << prob << endl;
+	// 	}
+	// 	cout << " idx : " << idx << endl;
+	// 	// if this particle is lucky enough to be >= xw.
+		 
+	// 	if (prob > thresholdweight) {
+	// 		if (bdebug) {
+	// 			cout << " particles[idx - 1].weight : " << particles[idx - 1].weight << endl;
+	// 		}
+	// 		new_particles.push_back(particles[idx - 1] );
+	// 		ni = ni + 1;
+	// 		cout << "ni :" << ni << endl;
+	// 	} else {
+	// 		cout << "smaller, prob :"  << prob << " thresholdweight : "<< thresholdweight << endl;
 			
-		}
+	// 	}
+	// }
+
+	// https://discussions.udacity.com/t/resampling-algorithm-using-resampling-wheel/241313/16
+	// seems using discrete_distribution is way faster than my naive sampling code in Lesson 13: Particle Filters "19. Quiz: New Particle".
+	std::vector<Particle> new_particles;
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+
+	// default_random_engine gen;
+    std::discrete_distribution<> dist(weights.begin(), weights.end());
+    // std::map<int, int> m;
+    for(int n = 0; n < num_particles; ++n) {
+		const int idx = dist(gen);
+        new_particles.push_back(particles[idx]);
 	}
 	cout << "before particles = new_particles; " << endl;
 	particles = new_particles;
