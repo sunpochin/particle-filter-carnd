@@ -27,7 +27,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	if (!is_initialized) {
 		cout << "x: " << x << ", y: " << y << ", theat: " << theta << ", std: " ;
-		num_particles = 1000;
+		num_particles = 10;
+		// debug
+		// num_particles = 1;
 		for(int iter = 0; iter < num_particles; iter++) {
 			// cout << "particles[iter] : " << particles[iter];
 			Particle part = Particle();
@@ -96,12 +98,141 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   and the following is a good resource for the actual equation to implement (look at equation 
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
+
+	bool bdebug = true;
+	bdebug = false;
+	// sensor_range = 50;
+	// sigma_landmark [2] = {0.3, 0.3};
+	cout << "noisy_observations size: " << observations.size() << endl;
+	cout << "len(map_landmarks) : " <<  map_landmarks.landmark_list.size() << endl;
+	// 10
+	// 42
+
+	// algorithm steps summary:
+	// 1. For each particle
+	// 2. take a list of particle's observations and transform them into maps coordinates
+	// 3. For each transformed observation you calculate a distance to all landmarks:
+	// 4. vector dists contains distances to all landmarks for single observation. 
+	//    You choose the minimum distance and associate id of landmark for this distance to the observation.
+	// 5. when your observation has an associated landmark, you're calculating 
+	//    the probability that particular particle's observation saw this particular landmark.
+	// 6. particle's total weight is a product of probabilities of each observations
+
+	for(int ni = 0; ni < num_particles; ni++) {
+		// 2. take a list of particle's observations and transform them into maps coordinates
+		// homogeneous transformation matrix:
+		// cos(theta), -sin(theta), Xp 
+		// sin(theta),  cos(theta), Yp
+		//          0,           0,  1
+		double theta = particles[ni].theta;
+		double Xp = particles[ni].x;
+		double Yp = particles[ni].y;
+		const int nobssize = observations.size();
+		
+		// cout << "Xp : " << Xp << " Yp : " << Yp << endl;
+		std::vector<LandmarkObs> observations_transf;
+		particles[ni].weight = 1;
+		for(int nj = 0; nj < nobssize; nj++) {
+			double Xc = observations[nj].x;
+			double Yc = observations[nj].y;
+			double id = observations[nj].id;
+
+			double tranfx = Xc * cos(theta) + Yc * (-sin(theta)) + Xp;
+			double tranfy = Xc * sin(theta) + Yc * ( cos(theta)) + Yp;
+			
+			LandmarkObs obs_t;
+			obs_t.id = observations[nj].id;
+			obs_t.x = tranfx;
+			obs_t.y = tranfy;
+			observations_transf.push_back(obs_t);
+
+			// 3. For each transformed observation you calculate a distance to all landmarks:
+			vector <double> dists;
+			for (Map::single_landmark_s slm : map_landmarks.landmark_list) {
+				double dst = dist(slm.x_f, slm.y_f, tranfx, tranfy);
+				dists.push_back(dst);
+			}
+
+			// 4. vector dists contains distances to all landmarks for single observation. 
+			//    You choose the minimum distance and associate id of landmark for this distance to the observation.
+			vector<double>::iterator result = min_element(begin(dists), end(dists));
+			Map::single_landmark_s lm = map_landmarks.landmark_list[distance(begin(dists), result)];
+			obs_t.id = lm.id_i;
+
+			// 5. when your observation has an associated landmark, you're calculating 
+			//    the probability that particular particle's observation saw this particular landmark.
+
+			// 6. particle's total weight is a product of probabilities of each observations
+			double sig_x = std_landmark[0];
+			double sig_y = std_landmark[1];
+			double gauss_norm = (1/(2 * M_PI * sig_x * sig_y) );
+			double exponent= pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) )+ 
+				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
+			double weight = gauss_norm * exp(-exponent);
+			// cout << "weight : " << weight << endl;
+			// maybe I should only multiple with observations of "obs_t.id" ?
+			if (weight > 0.0f) {
+				particles[ni].weight = particles[ni].weight * weight;
+				// cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
+			}
+		}
+		cout << "particles[ " << ni << "].weight : " << particles[ni].weight << endl;
+
+	}
+
 }
 
 void ParticleFilter::resample() {
 	// TODO: Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+
+	bool bdebug = true;
+	bdebug = false;
+	// codes from Lesson 13: Particle Filters "19. Quiz: New Particle".
+	// translate python codes to cpp.
+	// i = 1
+	// while i <=1000:
+	// 	x = random.randint(1,1000) 
+	// 	xw = random.random() 
+	// 	# if this particle is lucky enough to be >= xw.
+	// 	if w[x-1]/wsum >= xw:
+	// 		p3.append(p[x-1])
+	// 		i = i + 1
+	double wsum = 0;
+	for (int it = 0; it < num_particles; it++) {
+		wsum = wsum + particles[it].weight;
+	}
+	cout << "wsum : " << wsum << endl;
+	
+	std::vector<Particle> new_particles;
+	int ni = 1;
+	while(ni <= num_particles) {
+		double idx = rand() % num_particles + 1;
+		double thresholdweight = ((double) rand() / (RAND_MAX));
+		double prob = particles[idx].weight / wsum;
+		if (bdebug) {
+			cout << " thresholdweight : " << thresholdweight << endl;
+			cout << " idx : " << idx << endl;
+			cout << " particles[idx].weight  : " << particles[idx].weight << endl;
+			cout << " particles[idx].weight / wsum : " << prob << endl;
+		}
+		cout << " idx : " << idx << endl;
+	 	// if this particle is lucky enough to be >= xw.
+		if (prob > thresholdweight) {
+			if (bdebug) {
+				cout << " particles[idx - 1].weight : " << particles[idx - 1].weight << endl;
+			}
+			new_particles.push_back(particles[idx - 1] );
+			ni = ni + 1;
+			cout << "ni :" << ni << endl;
+		} else {
+			cout << "smaller, prob :"  << prob << " thresholdweight : "<< thresholdweight << endl;
+			
+		}
+	}
+	cout << "before particles = new_particles; " << endl;
+	particles = new_particles;
 
 }
 
