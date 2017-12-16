@@ -19,6 +19,12 @@
 
 using namespace std;
 
+// "Debug Suggestion - Testing Prediction Step", JacquesRoth.
+// a flag to debug ::prediction. Skips entire ::updateWeights and ::resample .
+// https://discussions.udacity.com/t/debug-suggestion-testing-prediction-step/306124?u=drivewell
+bool b_debugPrediction = true;
+
+
 void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	// TODO: Set the number of particles. Initialize all particles to first position (based on estimates of 
 	//   x, y, theta and their uncertainties from GPS) and all weights to 1. 
@@ -29,7 +35,8 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 		cout << "x: " << x << ", y: " << y << ", theat: " << theta << ", std: " ;
 		num_particles = 100;
 		// debug
-		num_particles = 2;
+		// num_particles = 50;
+		num_particles = 200;
 		for(int iter = 0; iter < num_particles; iter++) {
 			// cout << "particles[iter] : " << particles[iter];
 			Particle part = Particle();
@@ -78,6 +85,15 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		particles[i].x = sample_x;
 		particles[i].y = sample_y;
 		particles[i].theta = sample_theta;
+		
+		// adding random gaussian noise make x too large more easily ?
+		if (b_debugPrediction) {
+		// debug code
+			particles[i].x = partx;
+			particles[i].y = party;
+			particles[i].theta = parttheta;
+		}
+
 	}
 
 }
@@ -103,14 +119,14 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//   3.33
 	//   http://planning.cs.uiuc.edu/node99.html
 
+	if (b_debugPrediction) {
+		return;
+	}
 	bool bdebug = true;
 	bdebug = false;
 	// sensor_range = 50;
 	// sigma_landmark [2] = {0.3, 0.3};
-	cout << "noisy_observations size: " << observations.size() << endl;
-	cout << "len(map_landmarks) : " <<  map_landmarks.landmark_list.size() << endl;
-	// 10
-	// 42
+	// observations.size(): 10, map_landmarks.landmark_list.size() : 42
 
 	// algorithm steps summary:
 	// 1. For each particle
@@ -174,20 +190,24 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
 			double expval = exp(-exponent);
 			double weight = gauss_norm * exp(-exponent);
-			cout << "observation weight : " << weight << endl;
+			// cout << "observation weight : " << weight << endl;
 			if (weight == 0) {
-				cout << "it shouldn't be zero!" << endl;
-				cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
+				if (bdebug) {
+					cout << "it shouldn't be zero!" << endl;
+					cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
+				}
 			}
 
 //			if (weight > 0.0f) {
 			// must avoid a very very very small weight, which will making "particle total weight" zero.
 			if (weight > 1.00E-40f) {
 				particles[ni].weight = particles[ni].weight * weight;
-				cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
+				// cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
 			}
 		}
-		cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
+		if (bdebug) {
+			cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
+		}
 
 	}
 
@@ -197,6 +217,9 @@ void ParticleFilter::resample() {
 	// TODO: Resample particles with replacement with probability proportional to their weight. 
 	// NOTE: You may find std::discrete_distribution helpful here.
 	//   http://en.cppreference.com/w/cpp/numeric/random/discrete_distribution
+	if (b_debugPrediction) {
+		return;
+	}
 
 	bool bdebug = true;
 	bdebug = false;
@@ -261,7 +284,9 @@ void ParticleFilter::resample() {
 		const int idx = dist(gen);
         new_particles.push_back(particles[idx]);
 	}
-	cout << "before particles = new_particles; " << endl;
+	if (bdebug) {
+		cout << "before particles = new_particles; " << endl;
+	}
 	particles = new_particles;
 
 }
