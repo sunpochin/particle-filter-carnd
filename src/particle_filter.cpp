@@ -33,10 +33,9 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 
 	if (!is_initialized) {
 		cout << "x: " << x << ", y: " << y << ", theat: " << theta << ", std: " ;
-		num_particles = 100;
 		// debug
 		// num_particles = 50;
-		num_particles = 200;
+		num_particles = 100;
 		for(int iter = 0; iter < num_particles; iter++) {
 			// cout << "particles[iter] : " << particles[iter];
 			Particle part = Particle();
@@ -141,6 +140,7 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//    the probability that particular particle's observation saw this particular landmark.
 	// 6. particle's total weight is a product of probabilities of each observations
 
+    double total_weights = 0.0;
 	for(int ni = 0; ni < num_particles; ni++) {
 		// 2. take a list of particle's observations and transform them into maps coordinates
 		// homogeneous transformation matrix:
@@ -199,10 +199,15 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			// 6. particle's total weight is a product of probabilities of each observations
 			double sig_x = std_landmark[0];
 			double sig_y = std_landmark[1];
+			// # calculate normalization term
 			double gauss_norm = (1/(2 * M_PI * sig_x * sig_y) );
-			//"when you calculate the weight, make sure you compare x,y coordinates of landmark and observation but not landmark and particle"
+			// # calculate exponent: 
+			// exponent= ((x_obs - mu_x)**2)/(2 * sig_x**2) + 
+				// ((y_obs - mu_y)**2)/(2 * sig_y**2)
 			double exponent = pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) ) + 
 				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
+			//"when you calculate the weight, make sure you compare x,y coordinates of landmark and observation but not landmark and particle"
+
 			double expval = exp(-exponent);
 			double weight = gauss_norm * exp(-exponent);
 			// cout << "observation weight : " << weight << endl;
@@ -224,7 +229,16 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
 		}
 		weights[ni] = particles[ni].weight;
+		total_weights += particles[ni].weight;
 	}
+
+	if (total_weights != 0) {
+		for (int i = 0; i < weights.size(); i++) {
+			particles[i].weight = particles[i].weight / total_weights;
+			weights[i] = weights[i] / total_weights;
+		}
+	}
+
 
 }
 
