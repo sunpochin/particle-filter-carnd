@@ -139,7 +139,8 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	// sigma_landmark [2] = {0.3, 0.3};
 	// observations.size(): 10, map_landmarks.landmark_list.size() : 42
 
-	// algorithm steps summary:
+	// (from "C++ help with dataAssociation method": https://discussions.udacity.com/t/c-help-with-dataassociation-method/291220/5 )
+	// algorithm steps summary: 
 	// 1. For each particle
 	// 2. take a list of particle's observations and transform them into maps coordinates
 	// 3. For each transformed observation you calculate a distance to all landmarks:
