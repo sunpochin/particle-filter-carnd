@@ -34,8 +34,7 @@ void ParticleFilter::init(double x, double y, double theta, double std[]) {
 	if (!is_initialized) {
 		cout << "x: " << x << ", y: " << y << ", theat: " << theta << ", std: " ;
 		// debug
-		// num_particles = 50;
-		num_particles = 100;
+		num_particles = 25;
 		for(int iter = 0; iter < num_particles; iter++) {
 			// cout << "particles[iter] : " << particles[iter];
 			Particle part = Particle();
@@ -150,7 +149,6 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 	//    the probability that particular particle's observation saw this particular landmark.
 	// 6. particle's total weight is a product of probabilities of each observations
 
-    double total_weights = 0.0;
 	for(int ni = 0; ni < num_particles; ni++) {
 		// 2. take a list of particle's observations and transform them into maps coordinates
 		// homogeneous transformation matrix:
@@ -220,35 +218,21 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			double expval = exp(-exponent);
 			double weight = gauss_norm * exp(-exponent);
 			// cout << "observation weight : " << weight << endl;
-			if (weight == 0) {
-				if (bdebug) {
-					cout << "it shouldn't be zero!" << endl;
-					cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
-				}
-			}
+			// if (weight == 0) {
+			// 	if (bdebug) {
+			// 		cout << "it shouldn't be zero!" << endl;
+			// 		cout << "gauss_norm : " << gauss_norm << ", exponent : " << exponent << ", expval " << expval << ", weight : " << weight << endl;
+			// 	}
+			// }
 			if (weight > 0.0f) {
-			// must avoid a very very very small weight, which will making "particle total weight" zero.
-			// if (weight > 1.00E-40f) {
-				// debug
 				particles[ni].weight = particles[ni].weight * weight;
-				// cout << "in loop : particles[ni].weight : " << particles[ni].weight << endl;
 			}
 		}
 		if (bdebug) {
 			cout << "particles[ " << ni << " ].weight : " << particles[ni].weight << endl;
 		}
 		weights[ni] = particles[ni].weight;
-		total_weights += particles[ni].weight;
 	}
-
-	if (total_weights != 0) {
-		for (int i = 0; i < weights.size(); i++) {
-			particles[i].weight = particles[i].weight / total_weights;
-			weights[i] = weights[i] / total_weights;
-		}
-	}
-
-
 }
 
 void ParticleFilter::resample() {
