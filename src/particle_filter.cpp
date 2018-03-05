@@ -67,13 +67,23 @@ void ParticleFilter::prediction(double delta_t, double std_pos[], double velocit
 		double partx = part.x;
 		double party = part.y;
 		double parttheta = part.theta;
-		partx = partx + (velocity / yaw_rate) * (sin(parttheta + yaw_rate * delta_t) 
-			- sin(parttheta));
-		party = party + (velocity / yaw_rate) * (-cos(parttheta + yaw_rate * delta_t) 
-			+ cos(parttheta));
-		// ok it turned out my previous prediction goes all the way in y-axis 
-		// because at parttheta I forgot to "* delta_t" to yaw_rate ! Don't miss this again.
-		parttheta = parttheta + yaw_rate * delta_t;
+
+		// solve the bug of "simulator stops at time step 905":
+		// https://discussions.udacity.com/t/weights-go-to-zero/408684/10
+		double min_yaw_rate = 0.001;
+		if(std::abs(yaw_rate) < min_yaw_rate) {
+			partx = particles[i].x + (delta_t * velocity * (std::cos(parttheta)));
+			party = particles[i].y + (delta_t * velocity * (std::sin(parttheta)));
+		} else {
+			partx = partx + (velocity / yaw_rate) * (sin(parttheta + yaw_rate * delta_t) 
+				- sin(parttheta));
+			party = party + (velocity / yaw_rate) * (-cos(parttheta + yaw_rate * delta_t) 
+				+ cos(parttheta));
+			// ok it turned out my previous prediction goes all the way in y-axis 
+			// because at parttheta I forgot to "* delta_t" to yaw_rate ! Don't miss this again.
+			parttheta = parttheta + yaw_rate * delta_t;
+		}
+
 
 		// 2. and add random Gaussian noise.
 		// codes modified from lecture: https://classroom.udacity.com/nanodegrees/nd013/parts/40f38239-66b6-46ec-ae68-03afd8a601c8/modules/2c318113-724b-4f9f-860c-cb334e6e4ad7/lessons/5c50790c-5370-4c80-aff6-334659d5c0d9/concepts/53081ef1-a14c-4ae9-a68f-3ddc258cfd95
@@ -182,6 +192,9 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 			// 4. vector dists contains distances to all landmarks for single observation. 
 			//    choose the minimum distance and associate id of landmark for this distance to the observation.
 			vector<double>::iterator result = min_element(begin(dists), end(dists));
+
+			// 5. when your observation has an associated landmark, you're calculating 
+			//    the probability that particular particle's observation saw this particular landmark.
 			Map::single_landmark_s lm = map_landmarks.landmark_list[distance(begin(dists), result)];
 			obs_t.id = lm.id_i;
 			if (bdebug) {
@@ -193,17 +206,13 @@ void ParticleFilter::updateWeights(double sensor_range, double std_landmark[],
 				// cout << " Trans Obs(x,y) :" << " (" << transfx << "," << transfy << ") , " << endl;
 			}
 
-			// 5. when your observation has an associated landmark, you're calculating 
-			//    the probability that particular particle's observation saw this particular landmark.
-
 			// 6. particle's total weight is a product of probabilities of each observations
 			double sig_x = std_landmark[0];
 			double sig_y = std_landmark[1];
 			// # calculate normalization term
 			double gauss_norm = (1/(2 * M_PI * sig_x * sig_y) );
 			// # calculate exponent: 
-			// exponent= ((x_obs - mu_x)**2)/(2 * sig_x**2) + 
-				// ((y_obs - mu_y)**2)/(2 * sig_y**2)
+			// exponent= ((x_obs - mu_x)**2)/(2 * sig_x**2) + ((y_obs - mu_y)**2)/(2 * sig_y**2)
 			double exponent = pow((obs_t.x - lm.x_f), 2) / (2 * pow(sig_x, 2) ) + 
 				pow((obs_t.y - lm.y_f), 2) / (2 * pow(sig_y, 2) );
 			//"when you calculate the weight, make sure you compare x,y coordinates of landmark and observation but not landmark and particle"
